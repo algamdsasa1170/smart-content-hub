@@ -30,9 +30,13 @@ serve(async (req) => {
       const userId = session.client_reference_id;
       const customerId = session.customer as string;
       
-      // تحديد مستوى الاشتراك بناءً على السعر (مثال)
-      // في الواقع، يمكنك جلب تفاصيل الاشتراك من Stripe
-      const subscriptionTier = 'premium'; 
+      // جلب تفاصيل السعر لتحديد مستوى الاشتراك
+      const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+      const priceId = lineItems.data[0]?.price?.id;
+      
+      let subscriptionTier = 'free';
+      if (priceId === Deno.env.get('STRIPE_PRICE_BASIC_ID')) subscriptionTier = 'basic';
+      else if (priceId === Deno.env.get('STRIPE_PRICE_PREMIUM_ID')) subscriptionTier = 'premium';
 
       if (userId) {
         const { error } = await supabase
@@ -46,6 +50,22 @@ serve(async (req) => {
 
         if (error) throw error;
       }
+    }
+
+    // التعامل مع إلغاء الاشتراك
+    if (event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object as Stripe.Subscription;
+      const customerId = subscription.customer as string;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          subscription_tier: 'free',
+          updated_at: new Date().toISOString()
+        })
+        .eq('stripe_customer_id', customerId);
+
+      if (error) throw error;
     }
 
     return new Response(JSON.stringify({ received: true }), {
