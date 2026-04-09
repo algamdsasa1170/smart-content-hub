@@ -48,3 +48,19 @@ CREATE POLICY "Users can update their own content"
 CREATE POLICY "Users can delete their own content" 
   ON content FOR DELETE 
   USING (auth.uid() = user_id);
+
+-- وظيفة لإنشاء ملف تعريف مستخدم تلقائياً عند التسجيل
+CREATE OR REPLACE FUNCTION public.handle_new_user() 
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, avatar_url)
+  VALUES (new.id, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'avatar_url');
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- مشغل (Trigger) لاستدعاء الوظيفة عند إنشاء مستخدم جديد في auth.users
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+

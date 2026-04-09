@@ -4,4 +4,16 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          supabase: ['@supabase/supabase-js'],
+          stripe: ['@stripe/stripe-js'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
 })
